@@ -29,15 +29,20 @@ class TabBarExample extends StatefulWidget {
 class _TabBarExampleState extends State<TabBarExample>
     with TickerProviderStateMixin {
   late final TabController _tabController;
+  late final TextEditingController _inputController;
+  late String value;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _inputController = TextEditingController();
+    value = '';
   }
 
   @override
   void dispose() {
+    _inputController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -51,33 +56,62 @@ class _TabBarExampleState extends State<TabBarExample>
           icon: const Icon(Icons.search),
           tooltip: 'Search',
           onPressed: () {
-            // handle the press
+            setState(() {
+              value = _inputController.text;
+            });
           },
         ),
-        title: const TextField(),
+        title: TextField(
+          controller: _inputController,
+        ),
         actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.location_pin),
             tooltip: 'Geolocation',
             onPressed: () {
-              // handle the press
+              setState(() {
+                value = 'Geolocation';
+              });
             },
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const <Widget>[
-          Center(
-            child: Text("Currently"),
-          ),
-          Center(
-            child: Text("Today"),
-          ),
-          Center(
-            child: Text("Weekly"),
-          ),
-        ],
+      body: SingleChildScrollView(
+        child: TabBarView(
+          controller: _tabController,
+          children: <Widget>[
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text("Currently"),
+                  Text(value),
+                ],
+              ),
+            ),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text("Today"),
+                  Text(value),
+                ],
+              ),
+            ),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text("Weekly"),
+                  Text(value),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomAppBar(
         child: TabBar(
