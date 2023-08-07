@@ -76,7 +76,8 @@ class _TabBarExampleState extends State<TabBarExample>
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: SizedBox(
+        width: MediaQuery.of(context).size.width,
         child: TabBarView(
           controller: _tabController,
           children: <Widget>[
