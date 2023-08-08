@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-
-/// Flutter code sample for [TabBar].
+import 'service/geolocator.dart';
+import 'service/cities.dart';
+import 'autocomplete.dart';
 
 void main() => runApp(const TabBarApp());
 
@@ -29,16 +29,26 @@ class TabBarExample extends StatefulWidget {
 /// [TickerProviderStateMixin].
 class _TabBarExampleState extends State<TabBarExample>
     with TickerProviderStateMixin {
+  // Create a serviceGeolocator instance
+  final ServiceGeolocator serviceGeolocator = ServiceGeolocator();
+  final ServiceCities serviceCities = ServiceCities();
   late final TabController _tabController;
   late final TextEditingController _inputController;
-  late String value;
+  late String searchedTextValue;
+  late List<String> displayedCities;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _inputController = TextEditingController();
-    value = '';
+    searchedTextValue = '';
+    displayedCities = [
+      'London',
+      'Paris',
+      'New York',
+      'Tokyo',
+    ];
   }
 
   @override
@@ -48,25 +58,19 @@ class _TabBarExampleState extends State<TabBarExample>
     super.dispose();
   }
 
-  Future<void> _checkPermission() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.whileInUse ||
-        permission == LocationPermission.always) {
-      _getLocation();
-    }
+  Future<void> _findCities() async {
+    displayedCities = await serviceCities.getCities('London');
   }
 
-  Future<void> _getLocation() async {
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    double latitude = position.latitude;
-    double longitude = position.longitude;
-    print('Latitude: $latitude, Longitude: $longitude');
+  Future<void> _findLocation() async {
+    if (await serviceGeolocator.isLocationEnabled()) {
+      final position = await serviceGeolocator.getCurrentPosition();
+      final latitude = position.latitude.toString();
+      final longitude = position.longitude.toString();
+      searchedTextValue = '$latitude, $longitude';
+      return;
+    }
+    searchedTextValue = 'Location not enabled';
   }
 
   @override
@@ -79,26 +83,20 @@ class _TabBarExampleState extends State<TabBarExample>
           tooltip: 'Search',
           onPressed: () {
             setState(() {
-              value = _inputController.text;
+              searchedTextValue = _inputController.text;
             });
           },
         ),
-        title: TextField(
-          controller: _inputController,
-          onSubmitted: (input) {
-            setState(() {
-              value = input;
-            });
-          },
-        ),
+        title: CitiesAutocomplete(),
         actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.location_pin),
             tooltip: 'Geolocation',
             onPressed: () {
               setState(() {
-                _checkPermission();
-                value = 'Geolocation';
+                _findLocation();
+                // _findCities();
+                // _fetchWeather('12.1231', '12.1231');
               });
             },
           ),
@@ -109,13 +107,14 @@ class _TabBarExampleState extends State<TabBarExample>
         child: TabBarView(
           controller: _tabController,
           children: <Widget>[
+            // Create a list view of the displayed cities
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Text("Currently"),
-                  Text(value),
+                  Text(searchedTextValue),
                 ],
               ),
             ),
@@ -125,7 +124,7 @@ class _TabBarExampleState extends State<TabBarExample>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Text("Today"),
-                  Text(value),
+                  Text(searchedTextValue),
                 ],
               ),
             ),
@@ -135,7 +134,7 @@ class _TabBarExampleState extends State<TabBarExample>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Text("Weekly"),
-                  Text(value),
+                  Text(searchedTextValue),
                 ],
               ),
             ),
@@ -161,6 +160,38 @@ class _TabBarExampleState extends State<TabBarExample>
           ],
         ),
       ),
+    );
+  }
+}
+
+class AutocompleteExample extends StatefulWidget {
+  const AutocompleteExample({super.key});
+
+  static List<String> _kOptions = <String>[
+    'aardvark',
+    'bobcat',
+    'chameleon',
+  ];
+
+  @override
+  State<AutocompleteExample> createState() => AutocompleteExampleState();
+}
+
+class AutocompleteExampleState extends State<AutocompleteExample> {
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<String>(
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text == '') {
+          return const Iterable<String>.empty();
+        }
+        return AutocompleteExample._kOptions.where((String option) {
+          return option.contains(textEditingValue.text.toLowerCase());
+        });
+      },
+      onSelected: (String selection) {
+        debugPrint('You just selected $selection');
+      },
     );
   }
 }
