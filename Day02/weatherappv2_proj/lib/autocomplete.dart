@@ -1,30 +1,31 @@
 import 'package:flutter/material.dart';
 import './service/cities.dart';
 
-class CitiesAutocomplete extends StatefulWidget {
-  const CitiesAutocomplete({super.key});
+class AutocompleteCities extends StatefulWidget {
+  const AutocompleteCities({super.key});
+
+  static List<String> _kOptions = <String>[
+    'Paris',
+    'London',
+    'New York',
+  ];
 
   @override
-  State<CitiesAutocomplete> createState() => _CitiesAutocompleteState();
+  State<AutocompleteCities> createState() => AutocompleteCitiesState();
 }
 
-// WIP: Refactor this widget so it works without static, use AutocompleteExample as reference
-class _CitiesAutocompleteState extends State<CitiesAutocomplete> {
-  static List<String> _kOptions = <String>[
-    'London',
-    'Paris',
-  ];
+class AutocompleteCitiesState extends State<AutocompleteCities> {
   final ServiceCities serviceCities = ServiceCities();
 
-  TextEditingController _textEditingController = TextEditingController();
-
   Future<void> _findCities(String searchText) async {
-    if (searchText.isEmpty || searchText.length < 3) {
-      _kOptions = [];
+    if (searchText.length > 4) {
+      final newOptions = await serviceCities.getCities(searchText);
+      debugPrint('New options: $newOptions');
+      setState(() {
+        AutocompleteCities._kOptions = newOptions;
+      });
       return;
     }
-    print("searching for $searchText");
-    _kOptions = await serviceCities.getCities(searchText);
   }
 
   @override
@@ -34,8 +35,11 @@ class _CitiesAutocompleteState extends State<CitiesAutocomplete> {
         if (textEditingValue.text == '') {
           return const Iterable<String>.empty();
         }
-        return _kOptions.where((String option) {
-          return option.contains(textEditingValue.text.toLowerCase());
+        // return AutocompleteCities._kOptions;
+        return AutocompleteCities._kOptions.where((String option) {
+          return option
+              .toLowerCase()
+              .contains(textEditingValue.text.toLowerCase());
         });
       },
       onSelected: (String selection) {
@@ -45,14 +49,39 @@ class _CitiesAutocompleteState extends State<CitiesAutocomplete> {
           TextEditingController textEditingController,
           FocusNode focusNode,
           VoidCallback onFieldSubmitted) {
-        _textEditingController = textEditingController;
         return TextField(
           controller: textEditingController,
-          onChanged: (text) {
-            setState(() {
-              _findCities(text);
-            });
+          onChanged: (value) {
+            debugPrint('Status changed $value');
+            _findCities(value);
           },
+        );
+      },
+      optionsViewBuilder: (BuildContext context,
+          AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4.0,
+            child: SizedBox(
+              height: 200.0,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(8.0),
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final option = options.elementAt(index);
+                  return GestureDetector(
+                    onTap: () {
+                      onSelected(option);
+                    },
+                    child: ListTile(
+                      title: Text(option),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         );
       },
     );
