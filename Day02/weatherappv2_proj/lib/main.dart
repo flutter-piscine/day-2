@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:weatherappv2_proj/utils/views.dart';
 import 'service/geolocator.dart';
 import 'service/cities.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
@@ -40,7 +41,7 @@ class _TabBarExampleState extends State<TabBarExample>
   late String searchedTextValue;
   late String currentlyViewText;
   late List<List<String>> hourlyViewText;
-  late String dailyViewText;
+  late List<List<String>> dailyViewText;
   late List<String> displayedCities;
 
   @override
@@ -54,15 +55,19 @@ class _TabBarExampleState extends State<TabBarExample>
     regionText = '';
     countryText = '';
     hourlyViewText = [
-      ['', '', ''],
+      ['', '', '', ''],
     ];
-    dailyViewText = '';
+    dailyViewText = [
+      ['', '', '', ''],
+    ];
+    ;
     displayedCities = [
       'London',
       'Paris',
       'New York',
       'Tokyo',
     ];
+    _findLocation();
   }
 
   @override
@@ -77,24 +82,41 @@ class _TabBarExampleState extends State<TabBarExample>
       final position = await serviceGeolocator.getCurrentPosition();
       final latitude = position.latitude.toString();
       final longitude = position.longitude.toString();
-      searchedTextValue = '$latitude, $longitude';
+
+      if (latitude == '' || longitude == '') {
+        throw Exception('Location not found');
+      }
+      final weather = await serviceCities.getWeather(latitude, longitude);
+      final hourlyWeather =
+          await serviceCities.getHourlyWeather(latitude, longitude);
+
+      setState(() {
+        cityNameText = 'Sao Paulo';
+        regionText = 'Sao Paulo';
+        countryText = 'Brazil';
+        currentlyViewText = formatCurrentView(weather['current_weather']);
+        hourlyViewText = formatHourlyView(hourlyWeather);
+        dailyViewText = formatDailyView(weather['daily']);
+      });
       return;
     }
-    searchedTextValue = 'Location not enabled';
+    setState(() {
+      cityNameText =
+          'Geolocation is not available, please enable it in your App settings';
+    });
   }
 
   Future<void> _updateCurrentCity(String suggestion) async {
-    final cityName = suggestion.split(' -')[0];
+    final elements = suggestion.split(' - ');
+    final cityName = elements[0];
     String latitude = '';
     String longitude = '';
-    String region = '';
-    String country = '';
+    String region = elements[1];
+    String country = elements[2];
     serviceCities.results.forEach((city) {
-      if (city['name'] == cityName) {
+      if (city['name'] == cityName && city['region'] == region) {
         latitude = city['latitude'].toString();
         longitude = city['longitude'].toString();
-        region = city['region'] ?? 'Unknown';
-        country = city['country'];
         return;
       }
     });
@@ -105,30 +127,13 @@ class _TabBarExampleState extends State<TabBarExample>
     final hourlyWeather =
         await serviceCities.getHourlyWeather(latitude, longitude);
 
-    final currentWeather = weather['current_weather'];
-
-    final formattedCurrentView =
-        '${currentWeather['temperature']}°C\n${currentWeather['windspeed']} km/h';
-    debugPrint(formattedCurrentView);
-
-    List<String> time = List<String>.from(hourlyWeather['time']);
-    List<double> temperature = List<double>.from(hourlyWeather['temperature']);
-    List<double> windspeed = List<double>.from(hourlyWeather['windspeed']);
-
-    List<List<String>> formattedHourlyView = [];
-    for (int i = 0; i < time.length; i++) {
-      String hour = time[i].split('T')[1];
-      String temp = '${temperature[i].toString()} °C';
-      String windSpeed = '${windspeed[i].toString()} km/h';
-      formattedHourlyView.add([hour, temp, windSpeed]);
-    }
-
     setState(() {
       cityNameText = cityName;
       regionText = region;
       countryText = country;
-      currentlyViewText = formattedCurrentView;
-      hourlyViewText = formattedHourlyView;
+      currentlyViewText = formatCurrentView(weather['current_weather']);
+      hourlyViewText = formatHourlyView(hourlyWeather);
+      dailyViewText = formatDailyView(weather['daily']);
     });
   }
 
@@ -152,7 +157,7 @@ class _TabBarExampleState extends State<TabBarExample>
               autofocus: true,
               // add a simple style with font 24, text black
               style: const TextStyle(fontSize: 24, color: Colors.black),
-              decoration: const InputDecoration(labelText: 'City')),
+              decoration: const InputDecoration(labelText: 'Search location')),
           suggestionsCallback: (pattern) async {
             return await serviceCities.getCities(pattern);
           },
@@ -175,7 +180,7 @@ class _TabBarExampleState extends State<TabBarExample>
             tooltip: 'Geolocation',
             onPressed: () {
               setState(() {
-                // _findLocation();
+                _findLocation();
                 // _findCities();
                 // _fetchWeather('12.1231', '12.1231');
               });
@@ -189,20 +194,9 @@ class _TabBarExampleState extends State<TabBarExample>
           controller: _tabController,
           children: <Widget>[
             // Create a list view of the displayed cities
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(cityNameText),
-                  Text(regionText),
-                  Text(countryText),
-                  Text(currentlyViewText),
-                ],
-              ),
-            ),
-            Center(
-              child: SingleChildScrollView(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -210,33 +204,73 @@ class _TabBarExampleState extends State<TabBarExample>
                     Text(cityNameText),
                     Text(regionText),
                     Text(countryText),
-                    Column(
-                      children: List.generate(
-                        hourlyViewText.length,
-                        (index) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              Text(hourlyViewText[index][0]),
-                              Text(hourlyViewText[index][1]),
-                              Text(hourlyViewText[index][2]),
-                            ],
-                          );
-                        },
-                      ),
-                    )
+                    Text(currentlyViewText),
                   ],
                 ),
               ),
             ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text("Weekly"),
-                  Text(searchedTextValue),
-                ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(cityNameText),
+                      Text(regionText),
+                      Text(countryText),
+                      Column(
+                        children: List.generate(
+                          hourlyViewText.length,
+                          (index) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Expanded(child: Text(hourlyViewText[index][0])),
+                                Expanded(child: Text(hourlyViewText[index][1])),
+                                Expanded(child: Text(hourlyViewText[index][2])),
+                                Expanded(child: Text(hourlyViewText[index][3])),
+                              ],
+                            );
+                          },
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(cityNameText),
+                      Text(regionText),
+                      Text(countryText),
+                      Column(
+                        children: List.generate(
+                          dailyViewText.length,
+                          (index) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Expanded(child: Text(dailyViewText[index][0])),
+                                Expanded(child: Text(dailyViewText[index][1])),
+                                Expanded(child: Text(dailyViewText[index][2])),
+                                Expanded(child: Text(dailyViewText[index][3])),
+                              ],
+                            );
+                          },
+                        ),
+                      )
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
